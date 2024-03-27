@@ -50,7 +50,96 @@ systrace.py的执行依赖pywin32与six包
 
 
 
-## 4. Systrace工具[使用](https://blog.csdn.net/u011578734/article/details/109497064)
+## 4. Systrace工具[使用](https://blog.csdn.net/u011578734/article/details/109497064)[1]
+
+
+
+`systrace.py`命令的一般用法是[2]：
+
+> systrace.py [options] [category1 [category2 ...]]
+
+其中，`[options]` 是一些命令参数，`[category]` 等是你感兴趣的系统模块，比如view代表view系统（包含绘制流程），am代表ActivityManager（包含Activity创建过程等）；分析不同问题的时候，可以选择不同你感兴趣的模块。需要重复的是，尽可能缩小需要Trace的模块，其一是数据量小易与分析；其二，虽然systrace本身开销很小，但是缩小需要Trace的模块也能减少运行时开销。比如你分析卡顿的时候，`power`,  `webview` 就几乎是无用的。
+
+
+
+`[option]` 中比较重要的几个参数如下：
+
+- **-a <package_name>**：这个选项可以开启指定包名App中自定义Trace Label的Trace功能。也就是说，如果你在代码中使用了`Trace.beginSection("tag")`, `Trace.endSection`；默认情况下，你的这些代码是不会生效的，因此，这个选项一定要开启！
+- **-t N**：用来指定Trace运行的时间，取决于你需要分析过程的时间；还是那句话，在需要的时候尽可能缩小时间；当然，绝对不要把时间设的太短导致你操作没完Trace就跑完了，这样会出现`Did not finish` 的标签，分析数据就基本无效了。
+-  **-l**：这个用来列出你分析的那个手机系统支持的Trace模块；也就是上面命令中 `[category1]`能使用的部分；不同版本的系统能支持的模块是不同的，一般来说，高版本的支持的模块更多。
+- **-o FILE**：指定trace数据文件的输出路径，如果不指定就是当前目录的`trace.html`。
+
+
+
+
+
+`systrace.py -l` 可以输出手机能支持的Trace模块，而且输出还给出了此模块的用途；常用的模块如下
+
+`sched`: CPU调度的信息，非常重要；你能看到CPU在每个时间段在运行什么线程；线程调度情况，比如锁信息。
+
+`gfx`：Graphic系统的相关信息，包括SerfaceFlinger，VSYNC消息，Texture，RenderThread等；分析卡顿非常依赖这个。
+
+`view`: View绘制系统的相关信息，比如onMeasure，onLayout等；对分析卡顿比较有帮助。
+
+`am`：ActivityManager调用的相关信息；用来分析Activity的启动过程比较有效。
+
+`dalvik`: 虚拟机相关信息，比如GC停顿等。
+
+`binder_driver`: Binder驱动的相关信息，如果你怀疑是Binder IPC的问题，不妨打开这个。
+
+```shell
+PS G:\git\project\United-LRU-RGC\script\motivation> python27 F:\1_tools\platform-tools_r31.0.3-windows\systrace\systrace.py -l
+         gfx - Graphics
+       input - Input
+        view - View System
+     webview - WebView
+          wm - Window Manager
+          am - Activity Manager
+          sm - Sync Manager
+       audio - Audio
+       video - Video
+      camera - Camera
+         hal - Hardware Modules
+         res - Resource Loading
+      dalvik - Dalvik VM
+          rs - RenderScript
+      bionic - Bionic C Library
+       power - Power Management
+          pm - Package Manager
+          ss - System Server
+    database - Database
+     network - Network
+         adb - ADB
+    vibrator - Vibrator
+        aidl - AIDL calls
+       nnapi - NNAPI
+         rro - Runtime Resource Overlay
+         pdx - PDX services
+       sched - CPU Scheduling
+         irq - IRQ Events
+         i2c - I2C Events
+        freq - CPU Frequency
+        idle - CPU Idle
+        disk - Disk I/O
+         mmc - eMMC commands
+        sync - Synchronization
+       workq - Kernel Workqueues
+  memreclaim - Kernel Memory Reclaim
+  regulators - Voltage and Current Regulators
+  binder_driver - Binder Kernel driver
+  binder_lock - Binder global lock trace
+   pagecache - Page cache
+      memory - Memory
+     thermal - Thermal event
+        freq - CPU Frequency and System Clock (HAL)
+         gfx - Graphics (HAL)
+         ion - ION Allocation (HAL)
+      memory - Memory (HAL)
+       sched - CPU Scheduling and Trustzone (HAL)
+  thermal_tj - Tj power limits and frequency (HAL)
+```
+
+
 
 1）生成5s HTML报告：
 
@@ -68,6 +157,27 @@ python27 F:\1_tools\platform-tools_r31.0.3-windows\systrace\systrace.py -t 5 -o 
 
 
 
+## 5 [只抓取指定用户进程的trace](https://zhuanlan.zhihu.com/p/27331842)
+
+
+
+```shell
+ python27 F:\1_tools\platform-tools_r31.0.3-windows\systrace\systrace.py -t 600 memory pagecache memreclaim workq sync mmc disk idle freq irq rro database ss dalvik sched gfx view wm am binder_driver -a com.taobao.taobao -o taobao-600s.html
+```
+
+
+
+
+
+
+
+
+
+
+
 ## refs
 
-https://blog.csdn.net/u011578734/article/details/109497064
+[1] https://blog.csdn.net/u011578734/article/details/109497064
+
+[2] weishu,手把手教你使用Systrace（一）,https://zhuanlan.zhihu.com/p/27331842 , 2017.06.10.
+
