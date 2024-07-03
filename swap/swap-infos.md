@@ -6,16 +6,14 @@ ref from chatgpt 3.5
 
    创建一个脚本来配置 zram。这个脚本将在每次启动时运行。
 
-   ```
-   bash
-   Copy code
+   ```shell
    sudo nano /usr/local/bin/setup_zram.sh
    ```
 
    在文件中添加以下内容：
 
-   ```
-   bashCopy code#!/bin/bash
+   ```shell
+   #!/bin/bash
    
    # Disable all existing swap
    swapoff -a
@@ -45,9 +43,7 @@ ref from chatgpt 3.5
 
    使脚本可执行：
 
-   ```
-   bash
-   Copy code
+   ```shell
    sudo chmod +x /usr/local/bin/setup_zram.sh
    ```
 
@@ -55,16 +51,14 @@ ref from chatgpt 3.5
 
    创建一个 systemd 服务单元文件，以便在系统启动时运行脚本。
 
-   ```
-   bash
-   Copy code
+   ```shell
    sudo nano /etc/systemd/system/setup_zram.service
    ```
 
    在文件中添加以下内容：
 
-   ```
-   iniCopy code[Unit]
+   ```shell
+   [Unit]
    Description=Setup ZRAM Swap
    After=multi-user.target
    
@@ -84,16 +78,12 @@ ref from chatgpt 3.5
    启用服务以便它在启动时运行：
 
    ```
-   bash
-   Copy code
    sudo systemctl enable setup_zram.service
    ```
 
    立即启动服务：
 
-   ```
-   bash
-   Copy code
+   ```shell
    sudo systemctl start setup_zram.service
    ```
 
@@ -101,8 +91,8 @@ ref from chatgpt 3.5
 
    通过以下命令验证 zram 是否已正确配置：
 
-   ```
-   bashCopy codesudo swapon --show
+   ```shell
+   sudo swapon --show
    zramctl
    ```
 
