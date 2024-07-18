@@ -176,19 +176,436 @@ root@localhost:/# curl -X POST http://127.0.0.1:11434/api/generate -d '{"model":
 
 
 
-
-
-
-
-
-
-
-
 ## 3. 从huggingface中下载模型
 
-todo
+用xshell远程连接Termux，并进入root， 进入虚拟环境
+
+### 3.1 安装必要的库
+
+安装`python3`，`pip`
+
+```shell
+apt update
+apt upgrade -y
+apt install python3
+apt install python3-pip
+```
+
+模型运行一般需要`torch`和`transformers`， 测试模型需要数据库`datasets` ， 为了防止系统Python环境被破坏，我们使用虚拟环境
+
+1. **创建虚拟环境**：
+
+```
+python3 -m venv myenv
+```
+
+2. **激活虚拟环境**：
+
+```
+source myenv/bin/activate
+```
+
+xshell界面显示如下，即已进入虚拟环境
+
+```shell
+(myenv) root@localhost:~#
+```
+
+3. **安装库**：
+
+```shell
+pip install transformers
+pip install torch
+pip install datasets
+```
 
 
+
+### 3.2 从hugging face上下载模型，并传输到手机
+
+在这里我们选择`gemma-1.1-2b-it`【3】,下载模型需要在huggingface中登录账号，有些还需要申请，注册与申请信息都写美国（写中国可能被拒），点击`Files and versions`，如果可以看到文件，则说明可以直接下载或者已经通过了申请，直接在网页上就可以下载该模型，下载该目录下所有的文件，并通过Xftp传输到手机。如果需要申请，申请通过一般需要等待一个小时左右。
+
+
+
+## 3.3 运行模型
+
+huggingface网站`gemma-1.1-2b-it`主页`Model card`上给出了模型运行demo，由于我们已经把模型下载到了本地，将demo中模型路径修改为本地路径即可。
+
+**注**：gemma-1.1-2b-it支持用TPU运行【5】，但是需要`PyTorch/XLA`【6】,目前只支持x86，不支持arm【7】，因此在手机上暂时只能运行CPU与GPU推理版本
+
+### 3.3.1在CPU上运行模型
+
+参考官方[demo](https://huggingface.co/google/gemma-1.1-2b-it)
+
+### 3.3.2 在GPU上运行模型【尚未解决】
+
+**from ChatGPT3.5**
+
+[google](https://huggingface.co/google)/[gemma-1.1-2b-it](https://huggingface.co/google/gemma-1.1-2b-it) huggingface给的demo不能直接运行，因为demo使用CUDA运行在GPU上，仅支持英伟达；而采用`AIDA64`查看pixel6的GPU参数，得知 Pixel 6 使用的是基于 ARM 的 GPU（Mali-G78，openGL es3.2），它们不支持 CUDA。因此，需要调整代码以适应手机的 GPU 环境。
+
+**尝试使用 TensorFlow Lite**：
+
+TensorFlow Lite 是为移动和嵌入式设备设计的轻量级框架，可以将模型转换为适合移动设备运行的格式。你可以尝试将 PyTorch 模型转换为 TensorFlow，然后使用 TensorFlow Lite 运行。
+
+以下是将 PyTorch 模型转换为 TensorFlow Lite 的基本步骤：
+
+1. **将 PyTorch 模型转换为 ONNX**：
+
+   ```python
+   import torch
+   from transformers import AutoModelForCausalLM
+   
+   model_path = "/data/data/com.termux/files/home/google/gemma-1.1-2b-it"
+   model = AutoModelForCausalLM.from_pretrained(model_path)
+   
+   dummy_input = torch.randint(0, 2, (1, 3))
+   torch.onnx.export(model, dummy_input, "model.onnx")
+   ```
+
+2. **将 ONNX 模型转换为 TensorFlow**：
+
+   安装必要的包：
+
+   ```
+   pip install onnx onnx-tf
+   ```
+
+   转换模型：
+
+   ```python
+   import onnx
+   from onnx_tf.backend import prepare
+   
+   onnx_model = onnx.load("model.onnx")
+   tf_rep = prepare(onnx_model)
+   tf_rep.export_graph("model.pb")
+   ```
+
+3. **将 TensorFlow 模型转换为 TensorFlow Lite**：
+
+   ```python
+   import tensorflow as tf
+   
+   converter = tf.lite.TFLiteConverter.from_saved_model("model.pb")
+   tflite_model = converter.convert()
+   
+   with open("model.tflite", "wb") as f:
+       f.write(tflite_model)
+   ```
+
+   然后可以在手机上使用 TensorFlow Lite 运行该模型。
+
+
+
+完整的文件路径如下
+
+```shell
+/my_project
+│
+├── convert_model.py      # 用于将 PyTorch 模型转换为 TensorFlow Lite 模型
+├── run_tflite_model.py   # 用于在 Android 设备上运行 TensorFlow Lite 模型
+├── model.onnx            # 转换过程中的中间文件
+├── model.tflite          # 最终的 TensorFlow Lite 模型文件
+```
+
+
+
+#### 将 PyTorch 模型转换为 TensorFlow Lite 模型【Failed】
+
+**注**：在手机上执行`convert_model.py` 脚本失败，报错：`ModuleNotFoundError: No module named 'tensorflow_addons'`,在手机上安装`tensorflow_addons`失败
+
+
+
+以下是用于在计算机上进行模型转换的 `convert_model.py` 脚本：
+
+```python
+import torch
+from transformers import AutoModelForCausalLM
+import onnx
+from onnx_tf.backend import prepare
+import tensorflow as tf
+
+# 设置模型路径
+model_path = "/data/data/com.termux/files/home/google/gemma-1.1-2b-it"
+model = AutoModelForCausalLM.from_pretrained(model_path)
+
+# 1. 将 PyTorch 模型转换为 ONNX
+dummy_input = torch.randint(0, 2, (1, 128))
+torch.onnx.export(model, dummy_input, "model.onnx")
+
+# 2. 将 ONNX 模型转换为 TensorFlow
+onnx_model = onnx.load("model.onnx")
+tf_rep = prepare(onnx_model)
+tf_rep.export_graph("model")
+
+# 3. 将 TensorFlow 模型转换为 TensorFlow Lite
+converter = tf.lite.TFLiteConverter.from_saved_model("model")
+tflite_model = converter.convert()
+
+# 保存 TensorFlow Lite 模型
+with open("model.tflite", "wb") as f:
+    f.write(tflite_model)
+```
+
+运行这个脚本会生成 `model.onnx` 和 `model.tflite` 文件。
+
+#### 将模型文件复制到 Android 设备
+
+1. **将 `model.tflite` 文件复制到 Android 设备**：
+
+   使用 `adb` 将文件复制到 Android 设备：
+
+   ```python
+   adb push model.tflite /data/local/tmp/
+   ```
+
+#### 在 Android 设备上运行 TensorFlow Lite 模型
+
+在 Android 设备上，创建一个新的 Python 脚本来加载和运行 TensorFlow Lite 模型：
+
+```python
+import numpy as np
+import tensorflow as tf
+
+# 加载 TensorFlow Lite 模型
+interpreter = tf.lite.Interpreter(model_path="/data/local/tmp/model.tflite")
+interpreter.allocate_tensors()
+
+# 获取输入和输出张量的详细信息
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
+
+# 准备输入数据
+input_data = np.random.randint(0, 2, size=(1, 128)).astype(np.float32)
+
+# 将输入数据写入输入张量
+interpreter.set_tensor(input_details[0]['index'], input_data)
+
+# 运行推理
+interpreter.invoke()
+
+# 获取输出数据
+output_data = interpreter.get_tensor(output_details[0]['index'])
+print("Output:", output_data)
+```
+
+#### 运行步骤
+
+1. **在计算机上运行 `convert_model.py`**：
+
+   ```
+   python convert_model.py
+   ```
+
+   这将生成 `model.onnx` 和 `model.tflite` 文件。
+
+2. **将 `model.tflite` 文件复制到 Android 设备**：
+
+   ```
+   adb push model.tflite /data/local/tmp/
+   ```
+
+3. **在 Android 设备上运行 `run_tflite_model.py`**：
+
+   ```
+   python /data/local/tmp/run_tflite_model.py
+   ```
+
+
+
+安装依赖`onnx onnx-tf tensorflow`,由于`tensorflow`依赖`h5py`,先安装`h5py`
+
+```shell
+apt update
+apt upgrade
+apt install build-essential libhdf5-dev pkg-config
+pip install h5py #耗时较久
+```
+
+安装完成后，你可以验证 `h5py` 是否成功安装：
+
+```shell
+python -c "import h5py; print(h5py.__version__)"
+```
+
+这将打印安装的 `h5py` 版本，确认安装成功。
+
+安装依赖`onnx onnx-tf tensorflow`
+
+```shell
+pip install onnx onnx-tf tensorflow
+```
+
+
+
+## 3.4 用公开数据库测试模型
+
+在`gemma-1.1-2b-it`主页`Model card`上看到，其测试benchmark 包括`MMLU`【4】, 和下载模型类似，我们也将`MMLU`数据库下载到本地
+
+
+
+
+
+
+
+## 3.5 查看swap info
+
+
+
+```shell
+#1 系统IO状态信息
+iostat -x 1 
+```
+
+
+
+
+
+## 3.6 限制内存资源
+
+
+
+
+
+在服务器上【8】
+
+
+
+```shell
+vim /etc/security/limits.conf
+#在尾部插入
+@yy              hard    rss             50000000 #限制yy用户rss 为5GB
+```
+
+
+
+```shell
+vim /etc/pam.d/login
+#在尾部插入
+session    required            /lib/x86_64-linux-gnu/security/pam_limits.so
+```
+
+检查设置是否生效
+
+```shell
+su yy
+ulimit -a
+```
+
+```shell
+yy@tan08:/lib$ ulimit -a
+real-time non-blocking time  (microseconds, -R) unlimited
+core file size              (blocks, -c) 0
+data seg size               (kbytes, -d) unlimited
+scheduling priority                 (-e) 0
+file size                   (blocks, -f) unlimited
+pending signals                     (-i) 1029883
+max locked memory           (kbytes, -l) 32970832
+max memory size             (kbytes, -m) 50000000 #设置内存使用上限成功
+open files                          (-n) 1024
+pipe size                (512 bytes, -p) 8
+POSIX message queues         (bytes, -q) 819200
+real-time priority                  (-r) 0
+stack size                  (kbytes, -s) 8192
+cpu time                   (seconds, -t) unlimited
+max user processes                  (-u) 1029883
+virtual memory              (kbytes, -v) unlimited
+file locks                          (-x) unlimited
+```
+
+
+
+
+
+模型在termux终端中运行，也属于termux对应的用户，因此我们在Termux终端中通过` ulimit  -a`查看该会话的所有限制，也是模型运行的限制，可以看到占用内存大小无限制，**通过Termux 设置失败，因为 Termux 的环境与标准的 Linux 环境有所不同，并且某些系统级操作可能无法在 Termux 中实现**
+
+```shell
+ ulimit  -a
+```
+
+```shell
+#通过ulimit查看
+root@localhost:~# ulimit  -a
+real-time non-blocking time  (microseconds, -R) unlimited
+core file size              (blocks, -c) 0
+data seg size               (kbytes, -d) unlimited
+scheduling priority                 (-e) 40
+file size                   (blocks, -f) unlimited
+pending signals                     (-i) 27544
+max locked memory           (kbytes, -l) 64
+max memory size             (kbytes, -m) unlimited  
+open files                          (-n) 32768
+pipe size                (512 bytes, -p) 8
+POSIX message queues         (bytes, -q) 819200
+real-time priority                  (-r) 0
+stack size                  (kbytes, -s) 8192
+cpu time                   (seconds, -t) unlimited
+max user processes                  (-u) 27544
+virtual memory              (kbytes, -v) unlimited
+file locks                          (-x) unlimited
+```
+
+
+
+cgroup
+
+```shell
+#查看支持的cgroup
+mount | grep cgroup
+cat /proc/cgroups
+```
+
+```shell
+oriole:/sys/fs/cgroup/uid_10117 # mount | grep cgroup
+none on /dev/blkio type cgroup (rw,nosuid,nodev,noexec,relatime,blkio)
+none on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime,memory_recursiveprot)
+none on /dev/cpuctl type cgroup (rw,nosuid,nodev,noexec,relatime,cpu)
+none on /dev/cpuset type cgroup (rw,nosuid,nodev,noexec,relatime,cpuset,noprefix,release_agent=/sbin/cpuset_release_agent)
+```
+
+
+
+```shell
+130|oriole:/ $ cat /proc/cgroups
+#subsys_name    hierarchy       num_cgroups     enabled
+cpuset  3       10      1
+cpu     2       10      1
+cpuacct 0       205     1
+blkio   1       2       1
+memory  0       205     0 #????
+freezer 0       205     1
+net_prio        0       205     1
+```
+
+
+
+根据教程https://cloud.baidu.com/article/3002492
+
+```
+mkdir /sys/fs/cgroup/mygroup
+```
+
+但是该路径下并没有`memory.limit_in_bytes`，并且`cgroup.controllers`内容为空，
+
+另外，可以通过` cgroup.freeze`,冻结对应用户的所有进程
+
+```shell
+oriole:/sys/fs/cgroup/uid_10117 # echo 1 >> cgroup.freeze
+```
+
+
+
+
+
+
+
+https://serverfault.com/questions/929080/list-of-controllers-empty-with-cgroup-v2
+
+https://android.googlesource.com/kernel/common/+/429fec28c835/Documentation/admin-guide/cgroup-v2.rst
+
+https://medium.com/@charles.vissol/cgroup-v2-in-details-8c138088f9ba
+
+https://medium.com/@charles.vissol/cgroup-v2-in-details-8c138088f9ba
 
 
 
@@ -197,3 +614,15 @@ todo
 [1] https://aizdzj.com/news.php?id=120
 
 [2] https://ollama.com/library
+
+[3] https://huggingface.co/google/gemma-1.1-2b-it/tree/main
+
+[4] https://huggingface.co/datasets/hails/mmlu_no_train
+
+[5] https://huggingface.co/google/gemma-7b/blob/main/examples/example_fsdp.py
+
+[6] https://github.com/pytorch/xla
+
+[7] https://storage.googleapis.com/pytorch-xla-releases
+
+[8] https://blog.csdn.net/ranguangrong/article/details/116156885
