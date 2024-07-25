@@ -1,4 +1,4 @@
-# 1. 创建一个zram并开机自动挂起
+# 1. 创建一个zram并开机自动挂起Server
 
 ref from chatgpt 3.5
 
@@ -95,4 +95,61 @@ ref from chatgpt 3.5
    sudo swapon --show
    zramctl
    ```
+
+# 2.手机上创建一个swapfile
+
+```shell
+cat /proc/swaps
+swapoff /dev/block/zram0
+dd if=/dev/zero of=/data/local/tmp/swapfile bs=1M count=3072
+chmod 600 /data/local/tmp/swapfile
+mkswap /data/local/tmp/swapfile
+swapon /data/local/tmp/swapfile
+free -h
+```
+
+
+
+
+
+修改swapniness
+
+```shell
+#修改
+oriole:/ # sysctl vm.swappiness=60
+vm.swappiness = 60
+#查看修改是否成功
+oriole:/ # cat /proc/sys/vm/swappiness
+60
+```
+
+
+
+
+
+查看swap in/out
+
+```shell
+vmstate 1
+```
+
+
+
+perfetto
+
+```shell
+perfetto -c /data/misc/perfetto-configs/config_jank_tiktok.pbtx --txt -o  /data/misc/perfetto-traces/pixel6-no-swap-titok-30s-0bg.perfetto-trace
+
+perfetto -c /data/misc/perfetto-configs/config-new.pbtx --txt -o  /data/misc/perfetto-traces/pixel6-swapflash2g-titok-10s-4bg.perfetto-trace
+```
+
+
+
+systrace
+
+```shell
+python27 F:\1_tools\platform-tools_r31.0.3-windows\systrace\systrace.py -t 600 memory pagecache memreclaim workq sync mmc disk idle freq irq rro database ss dalvik sched gfx view wm am binder_driver -a com.ss.android.ugc.aweme -o tiktok-600s.html
+ 
+python27 F:\1_tools\platform-tools_r31.0.3-windows\systrace\systrace.py -t 6 memory pagecache memreclaim disk dalvik sched view -a com.ss.android.ugc.aweme -o tiktok-no-swap-6s.html
+```
 
