@@ -283,6 +283,12 @@ adb shell dumpsys meminfo com.ss.android.ugc.aweme
 
 
 
+#### target process
+
+```shell
+dumpsys meminfo [pid]
+```
+
 
 
 

@@ -76,4 +76,22 @@ event 说明
 
 ## 生成火焰图
 
-todo
+```shell
+#启动应用并进行分析
+blueline:/data/local/tmp # simpleperf record -p 5042 -g --duration 10 -o simpleperf_douyin_launch_10s.data
+```
+
+
+
+```shell
+#生成图形化报告（可选）
+D:\tools\android-ndk-r26d-windows\android-ndk-r26d\simpleperf> adb pull data/local/tmp/simpleperf_douyin_launch_10s.data
+D:\tools\android-ndk-r26d-windows\android-ndk-r26d\simpleperf> python report_html.py -i simpleperf_douyin_launch_10s.data -o simpleperf_douyin_launch_10s.html
+```
+
+
+
+![image-20241124132924278](Simpleperf.assets/image-20241124132924278.png)
+
+
+
